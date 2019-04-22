@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Pixel Painter</title>
+  <style>
+    .canvas {
+      border:1px solid;
+      /* display: inline-block; */
+      width:max-content;
+    }
+    .row {
+      display: flex;
+    }
+    .dot {
+      width:15px;
+      height:15px;
+      border:1px solid;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- 画板 -->
+    <div class="canvas">
+      <div class="row" v-for="(row,y) in pixelData">
+        <span @click="drawDot(x,y,color)" class="dot" v-for = "(dotColor,x)  in row" :style={background:dotColor}></span>
+      </div>
+    </div>
+    <!-- 选颜色功能 -->
+    <label :style="{color:c}" v-for="c of commonColors">
+      <input type="radio"  :value="c" v-model="color">{{c}}
+    </label>
+  </div>
+</body>
+
+<script src="./vue-2.6.10.js"></script>
+<!-- 可以不用任何框架，因为基本不使用框架的东西 -->
+<script>
+  const app = new Vue({
+    el:'#app',
+    data() {
+      return {
+        pixelData:[],
+        commonColors:['red','orange','yellow','green','aqua','blue','purple','black',],
+        color:'red',
+      }
+    },
+    methods:{
+      drawDot(x,y,color) {
+        this.ws.send(JSON.stringify({
+          type:'drawDot', 
+          x,y,color,
+        }))
+      }
+    },
+    mounted() { //加载好后链接服务器
+      var ws = new WebSocket('ws://localhost:9095')
+      this.ws = ws
+      //监听消息事件
+      ws.onmessage = ({data}) => { //解构赋值
+        data = JSON.parse(data)
+        if (data.type == 'init') {
+          this.pixelData = data.pixelData //箭头函数 this就是外边的this vue
+        } else if (data.type == 'updateDot') {
+          Vue.set(this.pixelData[data.y],data.x,data.color) 
+          //发现没有更新 vue对数组下标 不会更新
+          //使用vue set 属性
+        }
+      }
+    }
+
+
+  })
+</script>
+</html>
