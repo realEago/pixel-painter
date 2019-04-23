@@ -11,27 +11,22 @@
       /* display: inline-block; */
       width:max-content;
     }
-    .row {
-      display: flex;
-    }
-    .dot {
-      width:15px;
-      height:15px;
-      border:1px solid;
-    }
   </style>
 </head>
 <body>
   <div id="app">
     <!-- 画板 -->
-    <div class="canvas">
-      <div class="row" v-for="(row,y) in pixelData">
+    <div class="canvas" @click="handleCanvasClick">
+      <canvas ref="canvas" :width="width" :height="height"></canvas>
+      <!-- <div class="row" v-for="(row,y) in pixelData">
         <span @click="drawDot(x,y,color)" class="dot" v-for = "(dotColor,x)  in row" :style={background:dotColor}></span>
-      </div>
+      </div> -->
     </div>
-    <!-- 选颜色功能 -->
-    <label :style="{color:c}" v-for="c of commonColors">
-      <input type="radio"  :value="c" v-model="color">{{c}}
+    <button @click="isPickingColor = true">{{isPickingColor ? '正在取色' : '取色'}}</button>
+    <!-- 选颜色功能 后期改为饿了么组建 -->
+    <input type="color" v-model="color">
+    <label :style="{color:c.name}" v-for="c of commonColors" >
+      <input type="radio"  :value="c.value" v-model="color">{{c.name}}
     </label>
   </div>
 </body>
@@ -44,30 +39,113 @@
     data() {
       return {
         pixelData:[],
-        commonColors:['red','orange','yellow','green','aqua','blue','purple','black',],
-        color:'red',
+        commonColors:[{
+          name:'red',
+          value:'#ff0000'
+      },{
+        name:'yellow',
+        value:'#ffff00',
+      },{
+        name:'green',
+        value:'#008000',
+      },{
+        name:'blue',
+        value:'#0000ff',
+      },{
+        name:'white',
+        value:'#ffffff',
+      },{
+        name:'black',
+        value:'#000000',
+      }],
+        color:'#ffoooo',
+        width:600,
+        height:600,
+        isPickingColor:false,
       }
     },
     methods:{
-      drawDot(x,y,color) {
+      handleCanvasClick(e) {
+        if(this.isPickingColor) {
+          this.pickColor(e)
+        } else {
+          this.drawDot(e)
+        }
+      },
+      rgba2hex(dot) {
+        var dot = Array.from(dot)
+        dot = dot.map(it =>it.toString(16).padStart(2,'0'))
+        return '#' + dot[0] + dot[1] + dot[2]
+      },
+      pickColor(e) {
+        var x = e.layerX
+        var y = e.layerY
+        var p = this.ctx.getImageData(x,y,1,1).data
+        var hexColor = this.rgba2hex(p)
+        console.log(p,hexColor)
+        this.color = hexColor
+        this.isPickingColor = false
+      },
+      drawDot(e) {
+       // console.log(e)
+
         this.ws.send(JSON.stringify({
           type:'drawDot', 
-          x,y,color,
+          x:e.layerX,
+          y:e.layerY,
+          color:this.color,
         }))
       }
     },
     mounted() { //加载好后链接服务器
       var ws = new WebSocket('ws://localhost:9095')
       this.ws = ws
+
+      var canvas = this.$refs.canvas
+      canvas.style.imageRendering = 'pixelated' //去掉亚像素
+
+      var ctx = canvas.getContext('2d')
+      this.ctx = ctx
+
       //监听消息事件
-      ws.onmessage = ({data}) => { //解构赋值
-        data = JSON.parse(data)
-        if (data.type == 'init') {
-          this.pixelData = data.pixelData //箭头函数 this就是外边的this vue
-        } else if (data.type == 'updateDot') {
-          Vue.set(this.pixelData[data.y],data.x,data.color) 
+      ws.onmessage = (e) => { //解构赋值
+        var data = e.data
+        
+        
+        if (Object.prototype.toString.call(data) === '[object Blob]') {
+          //console.log('blob data 接受')
+          var tmpurl = URL.createObjectURL(data)
+          var image = new Image()
+          image.src = tmpurl
+          //document.body.appendChild(image)
+          image.onload = () => {
+            ctx.drawImage(image,0,0)
+          }
+        } else {
+          data = JSON.parse(data)
+          if (data.type == 'init') {
+          // this.pixelData = data.pixelData 
+          //箭头函数 this就是外边的this vue
+
+          // this.width = data.pixelData[0].length
+          // this.height = data.pixelData.length
+
+          // console.log(data)
+          // Vue.nextTick(() => {
+          //   data.pixelData.forEach((row,y) => {
+          //     row.forEach((color,x) => {
+          //       ctx.fillStyle = color
+          //       ctx.fillRect(x,y,1,1)
+          //     })
+          //   })
+          // })
+          } else if (data.type == 'updateDot') {
+          // Vue.set(this.pixelData[data.y],data.x,data.color) 
           //发现没有更新 vue对数组下标 不会更新
           //使用vue set 属性
+            ctx.fillStyle = data.color
+            ctx.fillRect(data.x,data.y,1,1)
+          }
         }
       }
     }
