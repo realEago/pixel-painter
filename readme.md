@@ -1,6 +1,6 @@
 # Pixel Painter
 
-#Tech used
+# Tech used
 
 * canvas
 * websocket
@@ -8,3 +8,5 @@
 * socket.io
 * Buffer
 * pixel manipulation
+
+线上地址:http://realeago.com:9095/
